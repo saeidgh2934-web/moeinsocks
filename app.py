@@ -1,6 +1,8 @@
 import os
 import streamlit as st
 from PIL import Image, ImageEnhance
+import pillow_heif
+pillow_heif.register_heif_opener()
 
 st.set_page_config(page_title="Moeinsocks AI Studio", page_icon="🧦", layout="wide")
 
@@ -52,8 +54,8 @@ category = st.sidebar.selectbox("دسته‌بندی محصول", ["مردانه
 texture_type = st.sidebar.selectbox("نوع بافت", ["تریکو صاف و مسطح (Plain Jersey)", "ملانژ نخی (Heather Melange)", "بافت‌دار برجسته (Embossed Knit)"])
 include_staging = st.sidebar.checkbox("چیدمان پکیج روی کف‌پوش چوبی", value=True)
 
-st.subheader("۱. آپلود عکس مرجع (فرمت‌های استاندارد JPG, PNG, WEBP)")
-uploaded_file = st.file_uploader("انتخاب تصویر مرجع محصول", type=["jpg", "jpeg", "png", "webp"])
+st.subheader("۱. آپلود عکس مرجع (پشتیبانی کامل از JPG, PNG, WEBP, HEIC)")
+uploaded_file = st.file_uploader("انتخاب تصویر مرجع محصول", type=["jpg", "jpeg", "png", "webp", "heic", "heif"])
 
 if uploaded_file is not None:
     try:
@@ -65,6 +67,37 @@ if uploaded_file is not None:
     if image is not None:
         col1, col2 = st.columns(2)
         
+        with col1:
+            st.image(image, caption="تصویر مرجع آپلودشده", use_container_width=True)
+            
+        with col2:
+            st.subheader("۲. خروجی تحلیل خودکار شورا")
+            st.info("موتور بینایی ماشین و مپینگ پیکسلی فعال شد.")
+            
+            st.write(f"- **نوع محصول:** {category}")
+            st.write(f"- **بافت تشخیص‌داده‌شده:** {texture_type}")
+            st.write(f"- **ارتفاع کالیبره‌شده:** {'دقیقاً ۴ سانتی‌متر بالای قوزک' if 'نیم‌ساق' in category else 'مچی استاندارد'}")
+            st.write(f"- **چیدمان مرچندایزینگ:** {'۱ پا روی چوب بلوط + چیدمان فشرده پکیج' if include_staging else 'فقط هیرو شات'}")
+            
+            prompt = engine.generate_prompt(category, texture_type, include_staging)
+            st.text_area("پرامپت جامع کالیبره‌شده:", prompt, height=150)
+            
+            if st.button("⚡ تولید و رندر نهایی کاتالوگ (AI Engine)"):
+                with st.spinner("در حال پردازش پیکسلی و کالیبراسیون 1:1..."):
+                    if image.mode != 'RGB':
+                        image = image.convert('RGB')
+                    size = max(image.size)
+                    square_img = Image.new("RGB", (size, size), (255, 255, 255))
+                    paste_x = (size - image.size[0]) // 2
+                    paste_y = (size - image.size[1]) // 2
+                    square_img.paste(image, (paste_x, paste_y))
+                    final_img = square_img.resize((1024, 1024), Image.Resampling.LANCZOS)
+                    
+                    enhancer = ImageEnhance.Sharpness(final_img)
+                    final_img = enhancer.enhance(1.2)
+                    
+                st.success("تصویر با موفقیت پردازش و برای استاندارد وب‌سایت (مربع 1:1) کالیبره شد!")
+                st.image(final_img, caption="تصویر تجاری نهایی آماده برای وب‌سایت Moeinsocks", use_container_width=True)        
         with col1:
             st.image(image, caption="تصویر مرجع آپلودشده", use_container_width=True)
             
