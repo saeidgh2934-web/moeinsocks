@@ -3,6 +3,12 @@ import io
 import streamlit as st
 from PIL import Image, ImageEnhance
 
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+except ImportError:
+    pass
+
 st.set_page_config(page_title="Moeinsocks AI Studio", page_icon="🧦", layout="wide")
 
 class MoeinsocksEngine:
@@ -58,15 +64,10 @@ uploaded_file = st.file_uploader("انتخاب تصویر مرجع محصول", 
 
 if uploaded_file is not None:
     try:
-        if uploaded_file.name.lower().endswith(('.heic', '.heif')):
-            import pillow_heif
-            pillow_heif.register_heif_opener()
-        
         raw_image = Image.open(uploaded_file)
         if raw_image.mode != 'RGB':
             raw_image = raw_image.convert('RGB')
             
-        # Convert in-memory to standard JPEG so browser renders it instantly
         buf = io.BytesIO()
         raw_image.save(buf, format="JPEG", quality=95)
         buf.seek(0)
