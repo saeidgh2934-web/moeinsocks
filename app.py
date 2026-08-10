@@ -1,8 +1,7 @@
 import os
+import io
 import streamlit as st
 from PIL import Image, ImageEnhance
-import pillow_heif
-pillow_heif.register_heif_opener()
 
 st.set_page_config(page_title="Moeinsocks AI Studio", page_icon="🧦", layout="wide")
 
@@ -59,16 +58,28 @@ uploaded_file = st.file_uploader("انتخاب تصویر مرجع محصول", 
 
 if uploaded_file is not None:
     try:
-        image = Image.open(uploaded_file)
+        if uploaded_file.name.lower().endswith(('.heic', '.heif')):
+            import pillow_heif
+            pillow_heif.register_heif_opener()
+        
+        raw_image = Image.open(uploaded_file)
+        if raw_image.mode != 'RGB':
+            raw_image = raw_image.convert('RGB')
+            
+        # Convert in-memory to standard JPEG so browser renders it instantly
+        buf = io.BytesIO()
+        raw_image.save(buf, format="JPEG", quality=95)
+        buf.seek(0)
+        image = Image.open(buf)
     except Exception as e:
-        st.error(f"خطا در خواندن تصویر: {e}")
+        st.error(f"خطا در خواندن یا تبدیل تصویر: {e}")
         image = None
 
     if image is not None:
         col1, col2 = st.columns(2)
         
         with col1:
-            st.image(image, caption="تصویر مرجع آپلودشده", use_container_width=True)
+            st.image(image, caption="تصویر مرجع آپلودشده (کالیبره‌شده)", use_container_width=True)
             
         with col2:
             st.subheader("۲. خروجی تحلیل خودکار شورا")
@@ -84,39 +95,6 @@ if uploaded_file is not None:
             
             if st.button("⚡ تولید و رندر نهایی کاتالوگ (AI Engine)"):
                 with st.spinner("در حال پردازش پیکسلی و کالیبراسیون 1:1..."):
-                    if image.mode != 'RGB':
-                        image = image.convert('RGB')
-                    size = max(image.size)
-                    square_img = Image.new("RGB", (size, size), (255, 255, 255))
-                    paste_x = (size - image.size[0]) // 2
-                    paste_y = (size - image.size[1]) // 2
-                    square_img.paste(image, (paste_x, paste_y))
-                    final_img = square_img.resize((1024, 1024), Image.Resampling.LANCZOS)
-                    
-                    enhancer = ImageEnhance.Sharpness(final_img)
-                    final_img = enhancer.enhance(1.2)
-                    
-                st.success("تصویر با موفقیت پردازش و برای استاندارد وب‌سایت (مربع 1:1) کالیبره شد!")
-                st.image(final_img, caption="تصویر تجاری نهایی آماده برای وب‌سایت Moeinsocks", use_container_width=True)        
-        with col1:
-            st.image(image, caption="تصویر مرجع آپلودشده", use_container_width=True)
-            
-        with col2:
-            st.subheader("۲. خروجی تحلیل خودکار شورا")
-            st.info("موتور بینایی ماشین و مپینگ پیکسلی فعال شد.")
-            
-            st.write(f"- **نوع محصول:** {category}")
-            st.write(f"- **بافت تشخیص‌داده‌شده:** {texture_type}")
-            st.write(f"- **ارتفاع کالیبره‌شده:** {'دقیقاً ۴ سانتی‌متر بالای قوزک' if 'نیم‌ساق' in category else 'مچی استاندارد'}")
-            st.write(f"- **چیدمان مرچندایزینگ:** {'۱ پا روی چوب بلوط + چیدمان فشرده پکیج' if include_staging else 'فقط هیرو شات'}")
-            
-            prompt = engine.generate_prompt(category, texture_type, include_staging)
-            st.text_area("پرامپت جامع کالیبره‌شده:", prompt, height=150)
-            
-            if st.button("⚡ تولید و رندر نهایی کاتالوگ (AI Engine)"):
-                with st.spinner("در حال پردازش پیکسلی و کالیبراسیون 1:1..."):
-                    if image.mode != 'RGB':
-                        image = image.convert('RGB')
                     size = max(image.size)
                     square_img = Image.new("RGB", (size, size), (255, 255, 255))
                     paste_x = (size - image.size[0]) // 2
